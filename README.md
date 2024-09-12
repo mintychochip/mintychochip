@@ -1,4 +1,5 @@
-[![mintychochip's stats](https://github-readme-stats.vercel.app/api?username=mintychochip)](https://github.com/anuraghazra/github-readme-stats)
+[![languages](https://github-readme-stats.vercel.app/api/top-langs/?username=mintychochip)](https://github.com/anuraghazra/github-readme-stats)
+
 
 
 <!--
