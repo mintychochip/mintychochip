@@ -14,10 +14,22 @@ export const palette = [
   '#62c47a', // 3 frog lit
   '#8a7d68', // 4 fly trail
   '#e8e2d0', // 5 title, tagline, credit, eyes, fly
-  '#f08aa8', // 6 tongue
+  '#b85a72', // 6 tongue shadow (base / underside)
+  '#f08aa8', // 7 tongue mid
+  '#ffc8d8', // 8 tongue highlight (upper edge + tip)
 ];
 
-const C = { bg: 0, frogDeep: 1, frogMid: 2, frogLit: 3, trail: 4, textBright: 5, tongue: 6 };
+const C = {
+  bg: 0,
+  frogDeep: 1,
+  frogMid: 2,
+  frogLit: 3,
+  trail: 4,
+  textBright: 5,
+  tongueDeep: 6,
+  tongue: 7,
+  tongueLit: 8,
+};
 
 const TITLE = 'welcome';
 const TAGLINE = 'to my github';
@@ -154,6 +166,8 @@ function litBox(draw) {
 
 // Screen space: x right, y down, z toward the viewer.
 const LIGHT = normalize([-0.45, -0.6, 0.66]);
+// Key light projected into the banner plane (y down), for tongue shading.
+const TONGUE_LIGHT = normalize([-LIGHT[0], -LIGHT[1], 0]);
 const HALF = normalize([LIGHT[0], LIGHT[1], LIGHT[2] + 1]);
 const BUMP = 9;
 // Sprite rows from here down are feet / toes — shaded with coarser dither.
@@ -402,14 +416,28 @@ function tongueTip(f) {
   return [lerp(MOUTH[0], x, reach), lerp(MOUTH[1], y, reach)];
 }
 
+function tongueShade(u, lx, ly) {
+  // u: 0 at the mouth, 1 at the tip. (lx, ly) is offset from the spine in the 2×2 body.
+  const l = Math.hypot(lx, ly) || 1;
+  const ux = lx / l;
+  const uy = ly / l;
+  const key = ux * TONGUE_LIGHT[0] + uy * TONGUE_LIGHT[1];
+  const along = (u - 0.5) * 0.35 + (u > 0.82 ? 0.2 : 0);
+  const tone = 0.45 * key + along;
+  if (tone >= 0.22) return C.tongueLit;
+  if (tone >= -0.12) return C.tongue;
+  return C.tongueDeep;
+}
+
 function drawTongue(px, W, H, tip, carrying) {
   const set = (x, y, v) => {
     if (x >= 0 && y >= 0 && x < W && y < H) px[y * W + x] = v;
   };
-  const disc = (cx, cy, r, v) => {
+  const disc = (cx, cy, r, plot) => {
     for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
       for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
-        if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) set(x, y, v);
+        const d = Math.hypot(x - cx, y - cy);
+        if (d <= r) plot(x, y, d / r);
       }
     }
   };
@@ -437,11 +465,29 @@ function drawTongue(px, W, H, tip, carrying) {
   for (const [x, y] of path) {
     for (let j = -1; j <= 2; j++) for (let i = -1; i <= 2; i++) set(x + i, y + j, C.bg);
   }
-  disc(tx + 0.5, ty + 0.5, 3.5, C.bg);
-  for (const [x, y] of path) {
-    for (let j = 0; j <= 1; j++) for (let i = 0; i <= 1; i++) set(x + i, y + j, C.tongue);
+  disc(tx + 0.5, ty + 0.5, 3.5, (x, y) => set(x, y, C.bg));
+  const n = path.length;
+  for (let k = 0; k < n; k++) {
+    const u = k / (n - 1 || 1);
+    const [px, py] = path[k];
+    // Spine through the 2×2 so the lit edge stays on the upper-left-facing side.
+    const [txd, tyd] =
+      k < n - 1
+        ? [path[k + 1][0] - px, path[k + 1][1] - py]
+        : [px - path[k - 1][0], py - path[k - 1][1]];
+    const tl = Math.hypot(txd, tyd) || 1;
+    const spineX = px - Math.round((tyd / tl) * 0.5);
+    const spineY = py + Math.round((txd / tl) * 0.5);
+    for (let j = 0; j <= 1; j++) {
+      for (let i = 0; i <= 1; i++) {
+        set(spineX + i, spineY + j, tongueShade(u, i - 0.5, j - 0.5));
+      }
+    }
   }
-  disc(tx + 0.5, ty + 0.5, 2.5, C.tongue);
+  disc(tx + 0.5, ty + 0.5, 2.5, (x, y, r) => {
+    const u = 0.92 + 0.08 * (1 - r);
+    set(x, y, tongueShade(u, (x - tx) * 0.35, (y - ty) * 0.35));
+  });
   if (carrying) {
     for (let j = 0; j <= 1; j++) for (let i = 0; i <= 1; i++) set(tx + i, ty + j, C.bg);
   }
