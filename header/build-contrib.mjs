@@ -1,6 +1,9 @@
 // Fetches the last year of GitHub contributions and writes a pixel heatmap SVG
 // for the profile README (same greens as the frog header / mintychochip.dev).
 import { writeFileSync } from 'node:fs';
+import dns from 'node:dns';
+
+dns.setDefaultResultOrder?.('ipv4first');
 
 const USER = process.env.GITHUB_USER ?? 'mintychochip';
 const OUT = new URL('../assets/readme-contrib.svg', import.meta.url);

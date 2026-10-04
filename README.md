@@ -2,10 +2,12 @@
 
 ### GitHub activity
 
-I keep a live pond version on **[mintychochip.dev](https://mintychochip.dev/#github)**. The grid below is the same year of commits, drawn in the frog greens so it matches the header.
+I keep an interactive live pond version on **[mintychochip.dev](https://mintychochip.dev/#github)** with animated frogs and daily commit breakdowns. The grid below reflects the same year of contributions in matching frog greens, updated daily.
 
 <p align="center">
-  <img src="assets/readme-contrib.svg" width="720" alt="GitHub contributions for the last year" />
+  <a href="https://mintychochip.dev/#github">
+    <img src="assets/readme-contrib.svg" width="720" alt="GitHub contributions for the last year — click for the interactive pond version" />
+  </a>
 </p>
 
 <p align="center">
