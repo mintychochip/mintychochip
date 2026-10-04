@@ -3,7 +3,7 @@ import { lerp, smoothstep, threshold } from '../lib/pixel.mjs';
 
 // The avatar frog, pillow-shaded from its own silhouette in three greens.
 // Its eyes follow a fly around the banner until its tongue snaps the fly out
-// of the air. The name and tagline sit on the left; the artist's credit hangs
+// of the air. The title and tagline sit on the left; the artist's credit hangs
 // right under the frog.
 export const delay = 5;
 
@@ -13,14 +13,14 @@ export const palette = [
   '#356b4f', // 2 frog mid
   '#62c47a', // 3 frog lit
   '#8a7d68', // 4 fly trail
-  '#e8e2d0', // 5 name, tagline, credit, eyes, fly
+  '#e8e2d0', // 5 title, tagline, credit, eyes, fly
   '#f08aa8', // 6 tongue
 ];
 
 const C = { bg: 0, frogDeep: 1, frogMid: 2, frogLit: 3, trail: 4, textBright: 5, tongue: 6 };
 
-const NAME = 'mintychochip';
-const TAGLINE = 'software engineer';
+const TITLE = 'welcome';
+const TAGLINE = 'to my github';
 const CREDIT = 'ttv/gigglegeist';
 
 const FRAMES = 100;
@@ -120,12 +120,15 @@ FROG.forEach((row, y) => {
 const ORIGIN = [BANNER[0] - 1 - MARGIN - SEEN.x1, MARGIN - SEEN.y0];
 const MOUTH = [ORIGIN[0] + 30, ORIGIN[1] + 16];
 
-// Name and tagline are one block, centred so there is equal space above and
-// below it.
+// Title and tagline are one block, centred on their lit pixels (not their
+// glyph cells) so there is equal space above and below it whatever the words.
 const TEXT_X = MARGIN;
 const TAGLINE_DY = 23;
-const NAME_Y = Math.floor((BANNER[1] - TAGLINE_DY - GLYPH_ROWS) / 2);
-const TAGLINE_Y = NAME_Y + TAGLINE_DY;
+const TITLE_BOX = litBox((plot) => drawText(TITLE, 0, 0, 2, plot));
+const TAGLINE_BOX = litBox((plot) => drawText(TAGLINE, 0, 0, 1, plot));
+const TEXT_H = TAGLINE_DY + TAGLINE_BOX.y1 - TITLE_BOX.y0 + 1;
+const TITLE_Y = Math.floor((BANNER[1] - TEXT_H) / 2) - TITLE_BOX.y0;
+const TAGLINE_Y = TITLE_Y + TAGLINE_DY;
 
 // The credit sits flush with the frog's right edge, with its lowest lit pixel
 // (the tail of a g) MARGIN above the bottom; whatever is left between it and
@@ -162,12 +165,12 @@ const PUPILS = [
 ];
 
 // [frame, x, y] waypoints for the fly; the tongue meets it at the last one.
-// It never dips below y 12 left of x 150, where the name starts at y 24.
+// It never dips below y 12 left of x 150, well above the title.
 const aroundMouth = (frame, dx, dy) => [frame, MOUTH[0] + dx, MOUTH[1] + dy];
 const FLIGHT = [
   // A lazy wave across the top of the banner.
   [0, -6, 9], [4, 16, 5], [8, 38, 12], [12, 60, 5], [16, 82, 12], [20, 104, 5], [24, 126, 11], [27, 148, 7],
-  // One clockwise loop in the gap between the name and the frog.
+  // One clockwise loop in the gap between the title and the frog.
   [30, 170, 6], [32.25, 177.8, 9.2], [34.5, 181, 17], [36.75, 177.8, 24.8], [39, 170, 28],
   [41.25, 162.2, 24.8], [43.5, 159, 17], [45.75, 162.2, 9.2], [48, 170, 6],
   // Darts and hovers in front of the frog's face (placed relative to its
@@ -188,7 +191,7 @@ export function render(W, H) {
   const base = new Uint8Array(W * H);
   const cursorX = TEXT_X + textWidth(TAGLINE) + 2;
   stampFrog(base, W, H, frog);
-  stampText(base, W, H, NAME, TEXT_X, NAME_Y, 2);
+  stampText(base, W, H, TITLE, TEXT_X, TITLE_Y, 2);
   stampText(base, W, H, TAGLINE, TEXT_X, TAGLINE_Y, 1);
   drawTiny(CREDIT, CREDIT_X, CREDIT_Y, (x, y) => {
     base[y * W + x] = C.textBright;
