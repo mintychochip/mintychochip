@@ -21,7 +21,7 @@ const C = { bg: 0, frogDeep: 1, frogMid: 2, frogLit: 3, trail: 4, textBright: 5,
 
 const TITLE = 'welcome';
 const TAGLINE = 'to my github';
-const CREDIT = 'ttv/gigglegeist';
+const CREDIT = 'image: ttv/gigglegeist';
 
 const FRAMES = 100;
 
