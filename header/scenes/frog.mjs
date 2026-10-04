@@ -1,114 +1,181 @@
-import { drawText, textWidth } from '../lib/font.mjs';
-import { lerp, threshold } from '../lib/pixel.mjs';
+import { drawText, textWidth, GLYPH_ROWS, drawTiny } from '../lib/font.mjs';
+import { lerp, smoothstep, threshold } from '../lib/pixel.mjs';
 
-// The avatar frog in the knot's 1-bit style: pillow-shaded from its own
-// silhouette, Bayer-dithered and rim-lit. Its eyes follow a fly around the
-// banner until its tongue snaps the fly out of the air.
-export const palette = ['#0d1117', '#e8e2d0'];
+// The avatar frog, pillow-shaded from its own silhouette in three greens.
+// Its eyes follow a fly around the banner until its tongue snaps the fly out
+// of the air. The name and tagline sit on the left; the artist's credit hangs
+// right under the frog.
 export const delay = 5;
+
+export const palette = [
+  '#0d1117', // 0 background / ink
+  '#1a3228', // 1 frog deep shadow
+  '#356b4f', // 2 frog mid
+  '#62c47a', // 3 frog lit
+  '#8a7d68', // 4 fly trail
+  '#e8e2d0', // 5 name, tagline, credit, eyes, fly
+  '#f08aa8', // 6 tongue
+];
+
+const C = { bg: 0, frogDeep: 1, frogMid: 2, frogLit: 3, trail: 4, textBright: 5, tongue: 6 };
+
+const NAME = 'mintychochip';
+const TAGLINE = 'software engineer';
+const CREDIT = 'ttv/gigglegeist';
 
 const FRAMES = 100;
 
-// Traced from the GitHub avatar at banner scale, mirrored to face the text:
+// Traced from the GitHub avatar at banner scale, facing left as in the avatar:
 // ' ' outside, '#' line, 'o' eye white, '.' skin, '+' dark spot.
 const FROG = [
-  '         ######                           ####',
-  '      ###oooo#################           #######',
-  '    ###oooooooooo##....#############    #oooooo##',
-  '   ##ooooooooooooo#................######oooooooo#',
-  '  ##oooooooooooooo##...................###oooooooo#',
-  '  #oooooooooooooooo#.....................##ooooooo##',
-  '  #oooooooooooooooo#.......................##ooooooo#',
-  ' ##oooooooooooooooo#........................##oooooo#',
-  ' #ooooooooooooooooo#.........................##ooooo#',
-  ' #oooooooooooooooo##..........................#ooooo#',
-  ' ##ooooooooooooooo#...........................##oooo#',
-  '  #oooooooooooooo##............................##ooo#',
-  '   ##oooo########...............................#ooo#',
-  '    ############................................#oo#',
-  '   #...#......................................#####',
-  '   #......##...............................###..#####',
-  '   #.......#..............................##....##..#',
-  '  ##........###..........................#......##.##',
-  '  #..........###############...........##.......####',
-  '  #.......................######......##........####',
-  '  #............................#####.##........###.##',
-  ' ##...........###..................###.........#+#..######',
-  ' ##..........##.####........###...............#####......####',
-  ' #...........##.#############..#.............####...........##',
-  ' #...##......######++++++++##..##...........##..####..........#',
-  ' #...###.......#####+++++###.###............##.###+##.........##',
-  '##.....#.........#.##++###..####.............####++##..........#',
-  '##.....##........#...###...#+++###..............#+##...........#',
-  '##......##.......#........##+++####............####............##',
-  '##.......#.......#........#+++##.##...........##.#####.........##',
-  '##..#....##.....##........#####.###...........########.........#',
-  '##..#.....#....###.........##.####.............###++##....#...##',
-  '##..##.....#..##.............##+#................####....######',
-  '##.###.....####..............#++#...............###.....####',
-  '##...##.....##..............##++#...............#########..#',
-  '##...##....##...............######..............####.......#',
-  '##....#........................#.#...............#.........##',
-  '##....#............############..##........................##   #####',
-  ' #....##........####..###.....####.........................##   #...#',
-  ' #.....##########..............##..........................##   #...#',
-  ' #.........................................................##   ##..## #####',
-  ' #.............................#...........................#    ##.#####...##',
-  ' #.....................##....######........................#    ##.##+##...##',
-  ' #....................#####..#....#...###..................#   ###.##++#..##',
-  ' #....................#...#..#....#..######...............##   ###.##++######',
-  ' #...................##...#..##..##.##....#...............#   #++#..#+####++####',
-  ' #...............#....###.#...#.##..##...##..............######+##..#+#.##+++#####',
-  ' ##............###......#.##..#.#...##.###..............##..##++#...###.##++###..#',
-  ' ##.............##......##.#..#.#...#.##...............##...#+++#.......#####....#',
-  ' ##..............####....#.#..#.#..##.#...............##...##+++#.......###..#####',
-  '  #.................####.#.#.##.#..#.##..............##...##++++#...........#',
-  '  #...................########..####.##............##....##++++##...........#',
-  '  #......................##..........#...........###....####+++##..........#',
-  '  #.......................#..........#.........###.....##..#####...........#',
-  '  #..................................#.....#####.......####.###............#',
-  '  #..................................##....#.#####.......###...............#',
-  '  ##..................................##################...##..............#',
-  '   #...................................######..##    #########............##',
-  '   ##..........................................##           ###############',
-  '    ####................#.................######                ##',
-  '       ##################...............##',
-  '           ################.......#######',
-  '                          ##########',
+  '                                    ####                           ######',
+  '                                  #######           #################oooo###',
+  '                                 ##oooooo#    #############....##oooooooooo###',
+  '                                #oooooooo######................#ooooooooooooo##',
+  '                               #oooooooo###...................##oooooooooooooo##',
+  '                              ##ooooooo##.....................#oooooooooooooooo#',
+  '                             #ooooooo##.......................#oooooooooooooooo#',
+  '                             #oooooo##........................#oooooooooooooooo##',
+  '                             #ooooo##.........................#ooooooooooooooooo#',
+  '                             #ooooo#..........................##oooooooooooooooo#',
+  '                             #oooo##...........................#ooooooooooooooo##',
+  '                             #ooo##............................##oooooooooooooo#',
+  '                             #ooo#...............................########oooo##',
+  '                              #oo#................................############',
+  '                               #####......................................#...#',
+  '                             #####..###...............................##......#',
+  '                             #..##....##..............................#.......#',
+  '                             ##.##......#..........................###........##',
+  '                              ####.......##...........###############..........#',
+  '                              ####........##......######.......................#',
+  '                             ##.###........##.#####............................#',
+  '                        ######..#+#.........###..................###...........##',
+  '                     ####......#####...............###........####.##..........##',
+  '                    ##...........####.............#..#############.##...........#',
+  '                   #..........####..##...........##..##++++++++######......##...#',
+  '                  ##.........##+###.##............###.###+++++#####.......###...#',
+  '                  #..........##++####.............####..###++##.#.........#.....##',
+  '                  #...........##+#..............###+++#...###...#........##.....##',
+  '                 ##............####............####+++##........#.......##......##',
+  '                 ##.........#####.##...........##.##+++#........#.......#.......##',
+  '                  #.........########...........###.#####........##.....##....#..##',
+  '                  ##...#....##++###.............####.##.........###....#.....#..##',
+  '                   ######....####................#+##.............##..#.....##..##',
+  '                      ####.....###...............#++#..............####.....###.##',
+  '                      #..#########...............#++##..............##.....##...##',
+  '                      #.......####..............######...............##....##...##',
+  '                     ##.........#...............#.#........................#....##',
+  '             #####   ##........................##..############............#....##',
+  '             #...#   ##.........................####.....###..####........##....#',
+  '             #...#   ##..........................##..............##########.....#',
+  '      ##### ##..##   ##.........................................................#',
+  '     ##...#####.##    #...........................#.............................#',
+  '     ##...##+##.##    #........................######....##.....................#',
+  '      ##..#++##.###   #..................###...#....#..#####....................#',
+  '     ######++##.###   ##...............######..#....#..#...#....................#',
+  '  ####++####+#..#++#   #...............#....##.##..##..#...##...................#',
+  '#####+++##.#+#..##+######..............##...##..##.#...#.###....#...............#',
+  '#..###++##.###...#++##..##..............###.##...#.#..##.#......###............##',
+  '#....#####.......#+++#...##...............##.#...#.#..#.##......##.............##',
+  '#####..###.......#+++##...##...............#.##..#.#..#.#....####..............##',
+  '     #...........#++++##...##..............##.#..#.##.#.#.####.................#',
+  '     #...........##++++##....##............##.####..########...................#',
+  '      #..........##+++####....###...........#..........##......................#',
+  '      #...........#####..##.....###.........#..........#.......................#',
+  '      #............###.####.......#####.....#..................................#',
+  '      #...............###.......#####.#....##..................................#',
+  '      #..............##...##################..................................##',
+  '      ##............#########    ##..######...................................#',
+  '       ###############           ##..........................................##',
+  '                ##                ######.................#................####',
+  '                                        ##...............##################',
+  '                                         #######.......################',
+  '                                              ##########',
 ];
-const ORIGIN = [172, 14];
-const MOUTH = [176, 29];
+
+// Layout. Everything hangs off one margin: the empty pixels between the
+// artwork and each edge of the banner (top, right and bottom of the frog and
+// credit, left of the text).
+const BANNER = [256, 80]; // build.mjs renders every scene at this size
+const MARGIN = 6;
+
+const cell = (x, y) => (y >= 0 && y < FROG.length ? (FROG[y][x] ?? ' ') : ' ');
+// The outline and the cells on the silhouette's edge are painted in the
+// background colour, so the frog you see is everything else.
+const shows = (x, y) =>
+  cell(x, y) !== ' ' &&
+  cell(x, y) !== '#' &&
+  ![cell(x - 1, y), cell(x + 1, y), cell(x, y - 1), cell(x, y + 1)].includes(' ');
+const SEEN = { x0: Infinity, y0: Infinity, x1: -1, y1: -1 };
+FROG.forEach((row, y) => {
+  for (let x = 0; x < row.length; x++) {
+    if (!shows(x, y)) continue;
+    SEEN.x0 = Math.min(SEEN.x0, x);
+    SEEN.y0 = Math.min(SEEN.y0, y);
+    SEEN.x1 = Math.max(SEEN.x1, x);
+    SEEN.y1 = Math.max(SEEN.y1, y);
+  }
+});
+
+const ORIGIN = [BANNER[0] - 1 - MARGIN - SEEN.x1, MARGIN - SEEN.y0];
+const MOUTH = [ORIGIN[0] + 30, ORIGIN[1] + 16];
+
+// Name and tagline are one block, centred so there is equal space above and
+// below it.
+const TEXT_X = MARGIN;
+const TAGLINE_DY = 23;
+const NAME_Y = Math.floor((BANNER[1] - TAGLINE_DY - GLYPH_ROWS) / 2);
+const TAGLINE_Y = NAME_Y + TAGLINE_DY;
+
+// The credit sits flush with the frog's right edge, with its lowest lit pixel
+// (the tail of a g) MARGIN above the bottom; whatever is left between it and
+// the frog's feet is the gap.
+const CREDIT_BOX = litBox((plot) => drawTiny(CREDIT, 0, 0, plot));
+const CREDIT_X = ORIGIN[0] + SEEN.x1 - CREDIT_BOX.x1;
+const CREDIT_Y = BANNER[1] - 1 - MARGIN - CREDIT_BOX.y1;
+if (CREDIT_Y + CREDIT_BOX.y0 <= ORIGIN[1] + SEEN.y1 + 1) {
+  throw new Error('frog scene: no room for the credit under the frog');
+}
+
+// Bounds of the pixels a draw function plots.
+function litBox(draw) {
+  const box = { x0: Infinity, y0: Infinity, x1: -1, y1: -1 };
+  draw((x, y) => {
+    box.x0 = Math.min(box.x0, x);
+    box.y0 = Math.min(box.y0, y);
+    box.x1 = Math.max(box.x1, x);
+    box.y1 = Math.max(box.y1, y);
+  });
+  return box;
+}
+
 // Screen space: x right, y down, z toward the viewer.
 const LIGHT = normalize([-0.45, -0.6, 0.66]);
 const HALF = normalize([LIGHT[0], LIGHT[1], LIGHT[2] + 1]);
 const BUMP = 9;
 // Sprite rows from here down are feet / toes — shaded with coarser dither.
 const FEET_Y = 36;
-// 4×4 ordered dither (2×2 logical blocks after upscale) for foot tones.
-const FOOT_BAYER = [
-  0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5,
-].map((v) => (v + 0.5) / 16);
 // Largest eye first.
 const PUPILS = [
   { size: [6, 2], reach: [3, 2.5] },
   { size: [3, 2], reach: [1.5, 2.5] },
 ];
 
-// [frame, x, y] paths — same start and catch; middle sections differ.
-const CATCH_XY = [144, 15];
-const FLIGHT_SWEEP = [
-  [0, -6, 10], [7, 20, 4], [14, 44, 13], [20, 66, 5], [26, 92, 12], [32, 116, 4], [38, 142, 9],
-  [43, 166, 3], [48, 194, 6], [53, 222, 3], [57, 214, 10], [61, 188, 5], [65, 162, 10], [69, ...CATCH_XY],
+// [frame, x, y] waypoints for the fly; the tongue meets it at the last one.
+// It never dips below y 12 left of x 150, where the name starts at y 24.
+const aroundMouth = (frame, dx, dy) => [frame, MOUTH[0] + dx, MOUTH[1] + dy];
+const FLIGHT = [
+  // A lazy wave across the top of the banner.
+  [0, -6, 9], [4, 16, 5], [8, 38, 12], [12, 60, 5], [16, 82, 12], [20, 104, 5], [24, 126, 11], [27, 148, 7],
+  // One clockwise loop in the gap between the name and the frog.
+  [30, 170, 6], [32.25, 177.8, 9.2], [34.5, 181, 17], [36.75, 177.8, 24.8], [39, 170, 28],
+  [41.25, 162.2, 24.8], [43.5, 159, 17], [45.75, 162.2, 9.2], [48, 170, 6],
+  // Darts and hovers in front of the frog's face (placed relative to its
+  // mouth), then drifts off to where the tongue catches it.
+  aroundMouth(50, -14, -16), aroundMouth(53, -12, -13), aroundMouth(55, -24, -1), aroundMouth(58, -22, 1),
+  aroundMouth(60, -13, -9), aroundMouth(62, -12, -8), aroundMouth(65, -23, -9), aroundMouth(67, -30, -9),
+  aroundMouth(69, -36, -10),
 ];
-const FLIGHT_ORBIT = [
-  [0, -6, 10], [8, 28, 6], [16, 58, 3], [24, 92, 8], [30, 128, 4], [36, 168, 6], [42, 204, 4],
-  [48, 218, 12], [52, 208, 22], [56, 188, 26], [60, 168, 22], [64, 152, 17], [67, 146, 15], [69, ...CATCH_XY],
-];
-const FLIGHT_ZIGZAG = [
-  [0, -6, 10], [6, 18, 14], [12, 42, 5], [18, 68, 15], [24, 94, 4], [30, 118, 14], [36, 142, 5],
-  [42, 168, 13], [48, 192, 6], [54, 210, 12], [58, 198, 8], [62, 178, 14], [66, 158, 12], [69, ...CATCH_XY],
-];
-const FLIGHT_BLEND = 3; // frames to cross-fade between path shapes
 const CATCH = 69;
 const SHOOT = CATCH - 2;
 const BACK = CATCH + 6;
@@ -116,16 +183,16 @@ const GULP = [BACK, BACK + 11];
 const BLINK = 20;
 
 export function render(W, H) {
+  if (W !== BANNER[0] || H !== BANNER[1]) throw new Error(`frog scene is laid out for ${BANNER.join('x')}`);
   const frog = frogLayer();
   const base = new Uint8Array(W * H);
-  const plot = (x, y) => {
-    if (x >= 0 && y >= 0 && x < W && y < H) base[y * W + x] = 1;
-  };
-  drawText('mintychochip', 16, 21, 2, plot);
-  drawText('software engineer', 16, 44, 1, plot);
-  const cursorX = 16 + textWidth('software engineer') + 2;
-  glow(base, W, H);
+  const cursorX = TEXT_X + textWidth(TAGLINE) + 2;
   stampFrog(base, W, H, frog);
+  stampText(base, W, H, NAME, TEXT_X, NAME_Y, 2);
+  stampText(base, W, H, TAGLINE, TEXT_X, TAGLINE_Y, 1);
+  drawTiny(CREDIT, CREDIT_X, CREDIT_Y, (x, y) => {
+    base[y * W + x] = C.textBright;
+  });
 
   const gaze = track(frog);
   const frames = [];
@@ -139,11 +206,17 @@ export function render(W, H) {
       drawFly(px, W, H, flight(f), f);
     }
     if (f % 25 < 13) {
-      for (let y = 46; y <= 50; y++) px.fill(1, y * W + cursorX, y * W + cursorX + 4);
+      for (let y = TAGLINE_Y + 2; y <= TAGLINE_Y + 6; y++) px.fill(C.textBright, y * W + cursorX, y * W + cursorX + 4);
     }
     frames.push(px);
   }
   return frames;
+}
+
+function stampText(px, W, H, text, x, y, scale) {
+  drawText(text, x, y, scale, (pxX, pxY) => {
+    if (pxX >= 0 && pxY >= 0 && pxX < W && pxY < H) px[pxY * W + pxX] = C.textBright;
+  });
 }
 
 function frogLayer() {
@@ -170,17 +243,16 @@ function frogLayer() {
       const n = normalize([(height[g - 1] - height[g + 1]) / 2, (height[g - gw] - height[g + gw]) / 2, 1]);
       const key = Math.max(0, dot(n, LIGHT));
       const spec = Math.max(0, dot(n, HALF)) ** 24;
-      const fill = Math.max(0, dot(n, [-LIGHT[0], -LIGHT[1], -LIGHT[2]])) * 0.12;
-      const belly = Math.min(1, Math.max(0, (y - 12) / 48));
-      const skin = 0.12 + 0.7 * key + 0.45 * spec + fill - 0.34 * belly;
+      const fill = Math.max(0, dot(n, [-LIGHT[0], -LIGHT[1], -LIGHT[2]])) * 0.08;
+      const belly = Math.min(1, Math.max(0, (y - 16) / 40));
+      // Pillow shading: bright facing planes stay solid; shadow + feet get dither at stamp.
+      const skin = 0.3 + key + 0.5 * spec + fill - 0.14 * belly;
       const i = y * w + x;
-      if (k === '.') tone[i] = y >= FEET_Y ? quantizeTone(skin, x, y) : skin;
-      else if (k === '+') {
-        const spot = 0.1 + 0.42 * key - 0.22 * belly;
-        tone[i] = y >= FEET_Y ? quantizeTone(spot, x, y) : 0.55 * skin;
-      }
+      if (k === '.') tone[i] = skin;
+      else if (k === '+') tone[i] = 0.5 * skin;
       else if (k === 'o') tone[i] = 1;
-      else tone[i] = [kind(x - 1, y), kind(x + 1, y), kind(x, y - 1), kind(x, y + 1)].includes(' ') ? 1 : 0;
+      else if (k === '#') tone[i] = 0; // ink lines — always stamped dark
+      else tone[i] = 0;
     }
   }
   return { w, h, kind, tone, eyes: eyesOf(kind, w, h) };
@@ -226,22 +298,16 @@ function stampFrog(px, W, H, frog) {
     const Y = ORIGIN[1] + y;
     if (X >= 0 && Y >= 0 && X < W && Y < H) px[Y * W + X] = v;
   };
-  for (let y = -1; y <= frog.h; y++) {
-    for (let x = -1; x <= frog.w; x++) {
-      if (frog.kind(x, y) !== ' ') continue;
-      const touches = [frog.kind(x - 1, y), frog.kind(x + 1, y), frog.kind(x, y - 1), frog.kind(x, y + 1)];
-      if (touches.some((k) => k !== ' ')) set(x, y, 0);
-    }
-  }
   for (let y = 0; y < frog.h; y++) {
     for (let x = 0; x < frog.w; x++) {
       const t = frog.tone[y * frog.w + x];
-      if (t >= 0) {
-        const sx = ORIGIN[0] + x;
-        const sy = ORIGIN[1] + y;
-        const feet = y >= FEET_Y && frog.kind(x, y) !== '#';
-        set(x, y, ditherTone(t, sx, sy, x, y, feet) ? 1 : 0);
+      if (t < 0) continue;
+      if (!shows(x, y)) {
+        set(x, y, C.bg);
+        continue;
       }
+      const feet = y >= FEET_Y;
+      set(x, y, frogInk(t, ORIGIN[0] + x, ORIGIN[1] + y, x, y, feet));
     }
   }
 }
@@ -255,7 +321,7 @@ function drawEyes(px, W, frog, gaze, lid, happy) {
     for (const [x, y] of eye.pixels) {
       const pupil = x >= pupilX && x < pupilX + pw && y >= pupilY && y < pupilY + ph;
       const lit = lid >= 1 || y < lidY || !(pupil || (lid > 0 && y === lidY));
-      px[(ORIGIN[1] + y) * W + ORIGIN[0] + x] = lit ? 1 : 0;
+      px[(ORIGIN[1] + y) * W + ORIGIN[0] + x] = lit ? C.textBright : C.bg;
     }
     if (lid < 1) return;
     // Closed: a lid line across the eye, bowed up into a ^ when content.
@@ -266,7 +332,7 @@ function drawEyes(px, W, frog, gaze, lid, happy) {
       const u = (x - eye.cx) / rx;
       const y = Math.round(eye.cy + 1 - lift * Math.max(0, 1 - u * u));
       for (let yy = Math.min(y, prev ?? y); yy <= Math.max(y, prev ?? y); yy++) {
-        if (frog.kind(x, yy) === 'o') px[(ORIGIN[1] + yy) * W + ORIGIN[0] + x] = 0;
+        if (frog.kind(x, yy) === 'o') px[(ORIGIN[1] + yy) * W + ORIGIN[0] + x] = C.bg;
       }
       prev = y;
     }
@@ -283,7 +349,7 @@ function lidAt(f) {
 // Eyes ease toward the fly (or, once it is eaten, toward where the next one
 // appears); two passes so the last frame hands off smoothly to the first.
 function track(frog) {
-  const rest = FLIGHT_SWEEP[0].slice(1);
+  const rest = FLIGHT[0].slice(1);
   let look = frog.eyes.map(() => [0, 0]);
   const out = [];
   for (let pass = 0; pass < 2; pass++) {
@@ -302,66 +368,28 @@ function track(frog) {
   return out;
 }
 
-function samplePath(path, f) {
+// Catmull-Rom spline through the waypoints, plus a wobble per flight style:
+// a lazy bob while gliding, almost none in the loop so its shape reads, and
+// a fast buzz while hovering between darts.
+function flight(f) {
   let i = 0;
-  while (i < path.length - 2 && path[i + 1][0] <= f) i++;
-  const p0 = path[Math.max(0, i - 1)];
-  const p1 = path[i];
-  const p2 = path[i + 1];
-  const p3 = path[Math.min(path.length - 1, i + 2)];
-  const span = p2[0] - p1[0] || 1;
-  const u = (f - p1[0]) / span;
+  while (i < FLIGHT.length - 2 && FLIGHT[i + 1][0] <= f) i++;
+  const p0 = FLIGHT[Math.max(0, i - 1)];
+  const p1 = FLIGHT[i];
+  const p2 = FLIGHT[i + 1];
+  const p3 = FLIGHT[Math.min(FLIGHT.length - 1, i + 2)];
+  const u = (f - p1[0]) / (p2[0] - p1[0]);
   const spline = (a, b, c, d) =>
     0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u);
-  return [spline(p0[1], p1[1], p2[1], p3[1]), spline(p0[2], p1[2], p2[2], p3[2])];
-}
-
-function flightJitter(f, pattern) {
-  if (pattern === 0) {
-    return [
-      1.3 * Math.sin(1.9 * f) + 0.6 * Math.sin(3.7 * f + 1),
-      1.5 * Math.sin(2.3 * f + 0.5) + 0.7 * Math.sin(4.1 * f + 2),
-    ];
-  }
-  if (pattern === 1) {
-    const a = 0.55 * f;
-    return [2.2 * Math.sin(a) + 0.8 * Math.sin(2.1 * f + 0.4), 1.8 * Math.cos(a + 0.6) + 0.5 * Math.sin(1.3 * f)];
-  }
+  const glide = 1 - smoothstep(26, 30, f);
+  const buzz = smoothstep(46, 50, f);
+  const loop = 1 - glide - buzz;
   return [
-    2.4 * Math.sin(5.1 * f) + 1.1 * Math.sin(7.3 * f + 1.2),
-    2.1 * Math.sin(5.4 * f + 0.8) + 0.9 * Math.cos(6.2 * f),
+    spline(p0[1], p1[1], p2[1], p3[1]) +
+      glide * 0.8 * Math.sin(1.7 * f) + loop * 0.4 * Math.sin(2.9 * f) + buzz * 1.2 * Math.sin(5.3 * f + 1),
+    spline(p0[2], p1[2], p2[2], p3[2]) +
+      glide * Math.sin(2.1 * f + 0.5) + loop * 0.4 * Math.cos(2.9 * f) + buzz * 1.2 * Math.sin(6.1 * f),
   ];
-}
-
-function blendFlight(a, b, t) {
-  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-}
-
-function flight(f) {
-  const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
-  const orbitStart = 22;
-  const zigStart = 46;
-  let pattern = 0;
-  let pos;
-  if (f < orbitStart) {
-    pos = samplePath(FLIGHT_SWEEP, f);
-  } else if (f < orbitStart + FLIGHT_BLEND) {
-    const t = clamp01((f - orbitStart) / FLIGHT_BLEND);
-    pattern = t > 0.5 ? 1 : 0;
-    pos = blendFlight(samplePath(FLIGHT_SWEEP, f), samplePath(FLIGHT_ORBIT, f), t);
-  } else if (f < zigStart) {
-    pattern = 1;
-    pos = samplePath(FLIGHT_ORBIT, f);
-  } else if (f < zigStart + FLIGHT_BLEND) {
-    const t = clamp01((f - zigStart) / FLIGHT_BLEND);
-    pattern = t > 0.5 ? 2 : 1;
-    pos = blendFlight(samplePath(FLIGHT_ORBIT, f), samplePath(FLIGHT_ZIGZAG, f), t);
-  } else {
-    pattern = 2;
-    pos = samplePath(FLIGHT_ZIGZAG, f);
-  }
-  const [jx, jy] = flightJitter(f, pattern);
-  return [pos[0] + jx, pos[1] + jy];
 }
 
 function tongueTip(f) {
@@ -404,15 +432,15 @@ function drawTongue(px, W, H, tip, carrying) {
     ]);
   }
   for (const [x, y] of path) {
-    for (let j = -1; j <= 2; j++) for (let i = -1; i <= 2; i++) set(x + i, y + j, 0);
+    for (let j = -1; j <= 2; j++) for (let i = -1; i <= 2; i++) set(x + i, y + j, C.bg);
   }
-  disc(tx + 0.5, ty + 0.5, 3.5, 0);
+  disc(tx + 0.5, ty + 0.5, 3.5, C.bg);
   for (const [x, y] of path) {
-    for (let j = 0; j <= 1; j++) for (let i = 0; i <= 1; i++) set(x + i, y + j, 1);
+    for (let j = 0; j <= 1; j++) for (let i = 0; i <= 1; i++) set(x + i, y + j, C.tongue);
   }
-  disc(tx + 0.5, ty + 0.5, 2.5, 1);
+  disc(tx + 0.5, ty + 0.5, 2.5, C.tongue);
   if (carrying) {
-    for (let j = 0; j <= 1; j++) for (let i = 0; i <= 1; i++) set(tx + i, ty + j, 0);
+    for (let j = 0; j <= 1; j++) for (let i = 0; i <= 1; i++) set(tx + i, ty + j, C.bg);
   }
 }
 
@@ -425,9 +453,9 @@ function drawFly(px, W, H, [fx, fy], f) {
     if (x >= 0 && y >= 0 && x < W && y < H) px[y * W + x] = v;
   };
   for (const [i, j] of body) {
-    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) set(x + i + a, y + j + b, 0);
+    for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) set(x + i + a, y + j + b, C.bg);
   }
-  for (const [i, j] of body) set(x + i, y + j, 1);
+  for (const [i, j] of body) set(x + i, y + j, C.textBright);
 }
 
 // Dots at fixed half-frame points along the past path, so they stay put and
@@ -438,19 +466,7 @@ function drawTrail(px, W, H, f) {
     const x = Math.round(tx + 0.5);
     const y = Math.round(ty + 0.5);
     if (x < 0 || y < 0 || x >= W || y >= H) continue;
-    if (1 - k / 11 > threshold(x, y)) px[y * W + x] = 1;
-  }
-}
-
-// Sparse dots under the frog, like the glow behind the knot.
-function glow(px, W, H) {
-  const cx = ORIGIN[0] + 38;
-  const cy = 77;
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const d = ((x - cx) / 58) ** 2 + ((y - cy) / 8) ** 2;
-      if (d < 1 && 0.2 * (1 - d) > threshold(x, y)) px[y * W + x] = 1;
-    }
+    if (1 - k / 11 > threshold(x, y)) px[y * W + x] = C.trail;
   }
 }
 
@@ -461,11 +477,11 @@ function quantizeTone(v, x, y) {
   return q;
 }
 
-function ditherTone(tone, sx, sy, x, y, feet) {
-  if (tone <= 0) return false;
-  if (tone >= 1) return true;
-  const gate = feet ? FOOT_BAYER[(y & 3) * 4 + (x & 3)] : threshold(sx, sy);
-  return tone > gate;
+function frogInk(tone, _sx, _sy, x, y, feet) {
+  const t = feet ? quantizeTone(tone, x, y) : tone;
+  if (t >= 0.62) return C.frogLit;
+  if (t >= 0.34) return C.frogMid;
+  return C.frogDeep;
 }
 
 function blur(src, w, h, r) {
