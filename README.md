@@ -6,7 +6,7 @@ I keep an interactive live pond version on **[mintychochip.dev](https://mintycho
 
 <p align="center">
   <a href="https://mintychochip.dev/#github">
-    <img src="assets/readme-contrib.svg" width="720" alt="GitHub contributions for the last year — click for the interactive pond version" />
+    <img src="assets/readme-contrib.svg" width="768" alt="GitHub contributions for the last year — click for the interactive pond version" />
   </a>
 </p>
 
