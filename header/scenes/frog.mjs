@@ -9,7 +9,7 @@ export const delay = 5;
 
 const FRAMES = 100;
 
-// Traced from the GitHub avatar at banner scale, mirrored to face the text:
+// Traced from the GitHub avatar at banner scale, mirrored to face the text (sprite flipped horizontally):
 // ' ' outside, '#' line, 'o' eye white, '.' skin, '+' dark spot.
 const FROG = [
   '         ######                           ####',
@@ -77,7 +77,7 @@ const FROG = [
   '                          ##########',
 ];
 const ORIGIN = [172, 14];
-const MOUTH = [176, 29];
+const MOUTH = [249, 29];
 // Screen space: x right, y down, z toward the viewer.
 const LIGHT = normalize([-0.45, -0.6, 0.66]);
 const HALF = normalize([LIGHT[0], LIGHT[1], LIGHT[2] + 1]);
