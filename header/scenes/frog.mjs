@@ -82,6 +82,12 @@ const MOUTH = [176, 29];
 const LIGHT = normalize([-0.45, -0.6, 0.66]);
 const HALF = normalize([LIGHT[0], LIGHT[1], LIGHT[2] + 1]);
 const BUMP = 9;
+// Sprite rows from here down are feet / toes — shaded with coarser dither.
+const FEET_Y = 36;
+// 4×4 ordered dither (2×2 logical blocks after upscale) for foot tones.
+const FOOT_BAYER = [
+  0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5,
+].map((v) => (v + 0.5) / 16);
 // Largest eye first.
 const PUPILS = [
   { size: [6, 2], reach: [3, 2.5] },
@@ -154,12 +160,15 @@ function frogLayer() {
       const n = normalize([(height[g - 1] - height[g + 1]) / 2, (height[g - gw] - height[g + gw]) / 2, 1]);
       const key = Math.max(0, dot(n, LIGHT));
       const spec = Math.max(0, dot(n, HALF)) ** 24;
-      // Skin is nearly solid where it faces the light so the ink lines read;
-      // the dither only shows up as the surface turns away.
-      const skin = 0.3 + key + 0.5 * spec;
+      const fill = Math.max(0, dot(n, [-LIGHT[0], -LIGHT[1], -LIGHT[2]])) * 0.12;
+      const belly = Math.min(1, Math.max(0, (y - 12) / 48));
+      const skin = 0.12 + 0.7 * key + 0.45 * spec + fill - 0.34 * belly;
       const i = y * w + x;
-      if (k === '.') tone[i] = skin;
-      else if (k === '+') tone[i] = 0.5 * skin;
+      if (k === '.') tone[i] = y >= FEET_Y ? quantizeTone(skin, x, y) : skin;
+      else if (k === '+') {
+        const spot = 0.1 + 0.42 * key - 0.22 * belly;
+        tone[i] = y >= FEET_Y ? quantizeTone(spot, x, y) : 0.55 * skin;
+      }
       else if (k === 'o') tone[i] = 1;
       else tone[i] = [kind(x - 1, y), kind(x + 1, y), kind(x, y - 1), kind(x, y + 1)].includes(' ') ? 1 : 0;
     }
@@ -217,7 +226,12 @@ function stampFrog(px, W, H, frog) {
   for (let y = 0; y < frog.h; y++) {
     for (let x = 0; x < frog.w; x++) {
       const t = frog.tone[y * frog.w + x];
-      if (t >= 0) set(x, y, t > threshold(ORIGIN[0] + x, ORIGIN[1] + y) ? 1 : 0);
+      if (t >= 0) {
+        const sx = ORIGIN[0] + x;
+        const sy = ORIGIN[1] + y;
+        const feet = y >= FEET_Y && frog.kind(x, y) !== '#';
+        set(x, y, ditherTone(t, sx, sy, x, y, feet) ? 1 : 0);
+      }
     }
   }
 }
@@ -382,6 +396,20 @@ function glow(px, W, H) {
       if (d < 1 && 0.2 * (1 - d) > threshold(x, y)) px[y * W + x] = 1;
     }
   }
+}
+
+function quantizeTone(v, x, y) {
+  const steps = 5;
+  const block = ((x >> 1) + (y >> 1) * 3) & 1 ? 0.04 : -0.02;
+  const q = Math.round(Math.min(1, Math.max(0, v + block)) * (steps - 1)) / (steps - 1);
+  return q;
+}
+
+function ditherTone(tone, sx, sy, x, y, feet) {
+  if (tone <= 0) return false;
+  if (tone >= 1) return true;
+  const gate = feet ? FOOT_BAYER[(y & 3) * 4 + (x & 3)] : threshold(sx, sy);
+  return tone > gate;
 }
 
 function blur(src, w, h, r) {
