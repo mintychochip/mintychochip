@@ -94,11 +94,21 @@ const PUPILS = [
   { size: [3, 2], reach: [1.5, 2.5] },
 ];
 
-// [frame, x, y] waypoints for the fly; the tongue meets it at the last one.
-const FLIGHT = [
+// [frame, x, y] paths — same start and catch; middle sections differ.
+const CATCH_XY = [144, 15];
+const FLIGHT_SWEEP = [
   [0, -6, 10], [7, 20, 4], [14, 44, 13], [20, 66, 5], [26, 92, 12], [32, 116, 4], [38, 142, 9],
-  [43, 166, 3], [48, 194, 6], [53, 222, 3], [57, 214, 10], [61, 188, 5], [65, 162, 10], [69, 144, 15],
+  [43, 166, 3], [48, 194, 6], [53, 222, 3], [57, 214, 10], [61, 188, 5], [65, 162, 10], [69, ...CATCH_XY],
 ];
+const FLIGHT_ORBIT = [
+  [0, -6, 10], [8, 28, 6], [16, 58, 3], [24, 92, 8], [30, 128, 4], [36, 168, 6], [42, 204, 4],
+  [48, 218, 12], [52, 208, 22], [56, 188, 26], [60, 168, 22], [64, 152, 17], [67, 146, 15], [69, ...CATCH_XY],
+];
+const FLIGHT_ZIGZAG = [
+  [0, -6, 10], [6, 18, 14], [12, 42, 5], [18, 68, 15], [24, 94, 4], [30, 118, 14], [36, 142, 5],
+  [42, 168, 13], [48, 192, 6], [54, 210, 12], [58, 198, 8], [62, 178, 14], [66, 158, 12], [69, ...CATCH_XY],
+];
+const FLIGHT_BLEND = 3; // frames to cross-fade between path shapes
 const CATCH = 69;
 const SHOOT = CATCH - 2;
 const BACK = CATCH + 6;
@@ -273,7 +283,7 @@ function lidAt(f) {
 // Eyes ease toward the fly (or, once it is eaten, toward where the next one
 // appears); two passes so the last frame hands off smoothly to the first.
 function track(frog) {
-  const rest = FLIGHT[0].slice(1);
+  const rest = FLIGHT_SWEEP[0].slice(1);
   let look = frog.eyes.map(() => [0, 0]);
   const out = [];
   for (let pass = 0; pass < 2; pass++) {
@@ -292,20 +302,66 @@ function track(frog) {
   return out;
 }
 
-function flight(f) {
+function samplePath(path, f) {
   let i = 0;
-  while (i < FLIGHT.length - 2 && FLIGHT[i + 1][0] <= f) i++;
-  const p0 = FLIGHT[Math.max(0, i - 1)];
-  const p1 = FLIGHT[i];
-  const p2 = FLIGHT[i + 1];
-  const p3 = FLIGHT[Math.min(FLIGHT.length - 1, i + 2)];
-  const u = (f - p1[0]) / (p2[0] - p1[0]);
+  while (i < path.length - 2 && path[i + 1][0] <= f) i++;
+  const p0 = path[Math.max(0, i - 1)];
+  const p1 = path[i];
+  const p2 = path[i + 1];
+  const p3 = path[Math.min(path.length - 1, i + 2)];
+  const span = p2[0] - p1[0] || 1;
+  const u = (f - p1[0]) / span;
   const spline = (a, b, c, d) =>
     0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u);
+  return [spline(p0[1], p1[1], p2[1], p3[1]), spline(p0[2], p1[2], p2[2], p3[2])];
+}
+
+function flightJitter(f, pattern) {
+  if (pattern === 0) {
+    return [
+      1.3 * Math.sin(1.9 * f) + 0.6 * Math.sin(3.7 * f + 1),
+      1.5 * Math.sin(2.3 * f + 0.5) + 0.7 * Math.sin(4.1 * f + 2),
+    ];
+  }
+  if (pattern === 1) {
+    const a = 0.55 * f;
+    return [2.2 * Math.sin(a) + 0.8 * Math.sin(2.1 * f + 0.4), 1.8 * Math.cos(a + 0.6) + 0.5 * Math.sin(1.3 * f)];
+  }
   return [
-    spline(p0[1], p1[1], p2[1], p3[1]) + 1.3 * Math.sin(1.9 * f) + 0.6 * Math.sin(3.7 * f + 1),
-    spline(p0[2], p1[2], p2[2], p3[2]) + 1.5 * Math.sin(2.3 * f + 0.5) + 0.7 * Math.sin(4.1 * f + 2),
+    2.4 * Math.sin(5.1 * f) + 1.1 * Math.sin(7.3 * f + 1.2),
+    2.1 * Math.sin(5.4 * f + 0.8) + 0.9 * Math.cos(6.2 * f),
   ];
+}
+
+function blendFlight(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
+
+function flight(f) {
+  const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+  const orbitStart = 22;
+  const zigStart = 46;
+  let pattern = 0;
+  let pos;
+  if (f < orbitStart) {
+    pos = samplePath(FLIGHT_SWEEP, f);
+  } else if (f < orbitStart + FLIGHT_BLEND) {
+    const t = clamp01((f - orbitStart) / FLIGHT_BLEND);
+    pattern = t > 0.5 ? 1 : 0;
+    pos = blendFlight(samplePath(FLIGHT_SWEEP, f), samplePath(FLIGHT_ORBIT, f), t);
+  } else if (f < zigStart) {
+    pattern = 1;
+    pos = samplePath(FLIGHT_ORBIT, f);
+  } else if (f < zigStart + FLIGHT_BLEND) {
+    const t = clamp01((f - zigStart) / FLIGHT_BLEND);
+    pattern = t > 0.5 ? 2 : 1;
+    pos = blendFlight(samplePath(FLIGHT_ORBIT, f), samplePath(FLIGHT_ZIGZAG, f), t);
+  } else {
+    pattern = 2;
+    pos = samplePath(FLIGHT_ZIGZAG, f);
+  }
+  const [jx, jy] = flightJitter(f, pattern);
+  return [pos[0] + jx, pos[1] + jy];
 }
 
 function tongueTip(f) {
